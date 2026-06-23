@@ -10,28 +10,25 @@ const fs = require("fs");
 const app = express();
 
 /* =========================
-   CREATE UPLOADS FOLDER
+   UPLOAD FOLDER
 ========================= */
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 
 /* =========================
-   MULTER CONFIG
+   MULTER
 ========================= */
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + "-" + file.originalname),
 });
 
 const upload = multer({ storage });
 
 /* =========================
-   SESSION
+   SESSION (Vercel safe)
 ========================= */
 app.use(
   session({
@@ -42,14 +39,11 @@ app.use(
 );
 
 /* =========================
-   PASSPORT INIT
+   PASSPORT
 ========================= */
 app.use(passport.initialize());
 app.use(passport.session());
 
-/* =========================
-   GOOGLE STRATEGY
-========================= */
 passport.use(
   new GoogleStrategy(
     {
@@ -63,41 +57,22 @@ passport.use(
   )
 );
 
-/* =========================
-   SESSION SERIALIZE
-========================= */
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-  done(null, user);
-});
-
-/* =========================
-   STATIC FILES
-========================= */
-app.use("/uploads", express.static("uploads"));
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
 
 /* =========================
    ROUTES
 ========================= */
 
-// HOME
+// ROOT (INI PENTING BIAR TIDAK 404)
 app.get("/", (req, res) => {
   res.send(`
-    <html>
-      <body style="font-family:Arial;text-align:center;margin-top:100px;">
-        <h1>Login App</h1>
-        <a href="/auth/google" style="padding:10px 15px;background:#4285F4;color:white;text-decoration:none;border-radius:8px;">
-          Login dengan Google
-        </a>
-      </body>
-    </html>
+    <h1>Login App</h1>
+    <a href="/auth/google">Login Google</a>
   `);
 });
 
-// LOGIN GOOGLE
+// GOOGLE LOGIN
 app.get(
   "/auth/google",
   passport.authenticate("google", {
@@ -116,7 +91,7 @@ app.get(
   }
 );
 
-// DASHBOARD (MODERN UI)
+// DASHBOARD
 app.get("/dashboard", (req, res) => {
   if (!req.user) return res.redirect("/");
 
@@ -125,128 +100,39 @@ app.get("/dashboard", (req, res) => {
   const photo = req.user.photos?.[0]?.value;
 
   res.send(`
-  <html>
-  <head>
-    <title>Dashboard</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #f4f6f9;
-      }
+    <h1>Dashboard</h1>
+    <img src="${photo}" width="100" style="border-radius:50%" />
+    <p>${name}</p>
+    <p>${email}</p>
 
-      .container {
-        max-width: 800px;
-        margin: 50px auto;
-        padding: 20px;
-      }
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+      <input type="file" name="file" />
+      <button>Upload</button>
+    </form>
 
-      .card {
-        background: white;
-        padding: 25px;
-        border-radius: 15px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        text-align: center;
-      }
-
-      img {
-        width: 110px;
-        height: 110px;
-        border-radius: 50%;
-        object-fit: cover;
-        margin-bottom: 10px;
-      }
-
-      h1 {
-        margin: 10px 0;
-      }
-
-      p {
-        color: #666;
-      }
-
-      .upload-box {
-        margin-top: 20px;
-        padding: 15px;
-        border: 2px dashed #ccc;
-        border-radius: 12px;
-      }
-
-      input {
-        margin-top: 10px;
-      }
-
-      button {
-        margin-top: 10px;
-        padding: 10px 15px;
-        border: none;
-        background: #4a90e2;
-        color: white;
-        border-radius: 8px;
-        cursor: pointer;
-      }
-
-      button:hover {
-        background: #357bd8;
-      }
-
-      a.logout {
-        display: inline-block;
-        margin-top: 15px;
-        color: red;
-        text-decoration: none;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div class="container">
-      <div class="card">
-        <img src="${photo}" />
-        <h1>${name}</h1>
-        <p>${email}</p>
-
-        <div class="upload-box">
-          <h3>Upload File</h3>
-          <form action="/upload" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" />
-            <br />
-            <button type="submit">Upload</button>
-          </form>
-        </div>
-
-        <a class="logout" href="/logout">Logout</a>
-      </div>
-    </div>
-  </body>
-  </html>
+    <a href="/logout">Logout</a>
   `);
 });
 
-// UPLOAD FILE
+// UPLOAD
 app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) return res.status(400).send("No file uploaded");
+  if (!req.file) return res.send("No file");
 
   res.send(`
-    <h2>Upload Berhasil</h2>
-    <p>${req.file.filename}</p>
-    <a href="/uploads/${req.file.filename}" target="_blank">Lihat File</a>
-    <br><br>
-    <a href="/dashboard">Kembali</a>
+    File: ${req.file.filename}
+    <br>
+    <a href="/uploads/${req.file.filename}">Lihat File</a>
+    <br>
+    <a href="/dashboard">Back</a>
   `);
 });
 
 // LOGOUT
 app.get("/logout", (req, res) => {
-  req.logout(() => {
-    res.redirect("/");
-  });
+  req.logout(() => res.redirect("/"));
 });
 
 /* =========================
-   SERVER
+   EXPORT (WAJIB VERCEL)
 ========================= */
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running: http://localhost:${PORT}`);
-});
+module.exports = app;
